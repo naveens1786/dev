@@ -1,0 +1,84 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_USER = "navchan86"
+
+        DEV_IMAGE  = "${DOCKERHUB_USER}/dev"
+        PROD_IMAGE = "${DOCKERHUB_USER}/prod"
+
+        EC2_HOST = "13.204.76.199"
+        DEPLOY_DIR = "/home/ubuntu/devops-build"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def imageRepo = env.BRANCH_NAME == 'master'
+                        ? env.PROD_IMAGE
+                        : env.DEV_IMAGE
+
+                    env.IMAGE_REPO = imageRepo
+                    env.IMAGE_TAG = "${imageRepo}:${env.BUILD_NUMBER}"
+
+                    sh """
+                        docker build -t ${IMAGE_TAG} .
+                        docker tag ${IMAGE_TAG} ${imageRepo}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login \
+                          -u "$DOCKER_USER" --password-stdin
+
+                        docker push "$IMAGE_TAG"
+                        docker push "$IMAGE_REPO:latest"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@$EC2_HOST "
+                            cd $DEPLOY_DIR &&
+                            export IMAGE_NAME=$IMAGE_REPO:$BUILD_NUMBER &&
+                            docker compose pull &&
+                            docker compose up -d --force-recreate
+                        "
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build and deployment successful"
+        }
+        failure {
+            echo "Build or deployment failed"
+        }
+    }
+}
