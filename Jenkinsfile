@@ -7,7 +7,7 @@
         DEV_IMAGE  = "${DOCKERHUB_USER}/dev"
         PROD_IMAGE = "${DOCKERHUB_USER}/prod"
 
-        EC2_HOST = "3.110.55.102"
+        EC2_HOST = "13.204.76.199"
         DEPLOY_DIR = "/home/ubuntu/devops-build"
     }
 
