@@ -8,7 +8,7 @@
         PROD_IMAGE = "${DOCKERHUB_USER}/prod"
 
         EC2_HOST = "13.204.76.199"
-        DEPLOY_DIR = "/home/ubuntu/devops-build"
+        DEPLOY_DIR = "/root/devops-build"
     }
 
     stages {
